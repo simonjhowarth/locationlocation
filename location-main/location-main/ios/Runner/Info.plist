@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key>
+  <string>LocationApp</string>
+
+  <!-- Location usage descriptions - customize text for App Store reviews -->
+  <key>NSLocationWhenInUseUsageDescription</key>
+  <string>We need your location to show tracking on the map while using the app.</string>
+  <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+  <string>We need background access to continue tracking when the app is backgrounded.</string>
+  <key>NSLocationAlwaysUsageDescription</key>
+  <string>Allows tracking in the background to maintain location updates.</string>
+
+  <!-- Allow location updates in background -->
+  <key>UIBackgroundModes</key>
+  <array>
+    <string>location</string>
+  </array>
+
+</dict>
+</plist>

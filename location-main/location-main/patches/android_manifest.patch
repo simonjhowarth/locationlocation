@@ -1,0 +1,22 @@
+AndroidManifest.xml edits (insert these lines into android/app/src/main/AndroidManifest.xml)
+
+1) Add the following permission lines as direct children of the <manifest> element (near the top):
+
+    <!-- Location permissions -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- For background location on Android 10+ -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+2) Update the <application> tag to include foreground service type if you plan to use a foreground service for continuous tracking:
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:foregroundServiceType="location">
+
+Replace existing <application ...> start tag with the one above (preserve other attributes). Remove the added attribute if you don't use foreground services.
+
+Notes:
+- These edits assume you generated the Android folder via `flutter create .`.
+- After applying, rebuild the app and test on device to confirm runtime permission requests behave correctly.

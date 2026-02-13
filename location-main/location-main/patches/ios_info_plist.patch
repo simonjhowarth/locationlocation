@@ -1,0 +1,18 @@
+Info.plist edits (insert these keys into ios/Runner/Info.plist inside the top-level <dict>)
+
+Add the following keys (user-facing strings must explain why you need location):
+
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>We need your location to show tracking on the map while using the app.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>We need background access to continue tracking when the app is backgrounded.</string>
+    <key>NSLocationAlwaysUsageDescription</key>
+    <string>Allows tracking in the background to maintain location updates.</string>
+    <key>UIBackgroundModes</key>
+    <array>
+      <string>location</string>
+    </array>
+
+Notes:
+- Insert these entries before the closing </dict> in `ios/Runner/Info.plist`.
+- Make sure strings clearly explain why background location is required; iOS reviews can reject vague reasons.

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Kalman Filter Location Demo</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Kalman Filter — Location Smoothing Demo</h1>
+
+  <div class="controls">
+    <label>Noise (meters): <input id="noise" type="range" min="0" max="50" value="8"/></label>
+    <label>Interval (ms): <input id="interval" type="number" min="50" max="2000" value="250"/></label>
+    <label>Kalman q: <input id="kf_q" type="range" min="0.00001" max="0.01" step="0.00001" value="0.0001"/></label>
+    <label>Kalman r: <input id="kf_r" type="range" min="0.0001" max="0.1" step="0.0001" value="0.005"/></label>
+    <label>Distance filter (m): <input id="distanceFilter" type="number" min="0" max="1000" value="0"/></label>
+    <button id="reset">Reset Filter</button>
+    <button id="start">Start</button>
+    <button id="stop" disabled>Stop</button>
+    <label><input id="showLogs" type="checkbox" checked/> Show logs</label>
+  </div>
+
+  <div class="controls">
+    <label>Geofence center (m): <input id="gf_center" type="number" value="300"/></label>
+    <label>Geofence radius (m): <input id="gf_radius" type="number" value="60"/></label>
+    <label><input id="gf_enabled" type="checkbox" checked/> Enable Geofence</label>
+    <label><input id="showFilteredOnly" type="checkbox"/> Show Filtered Only</label>
+  </div>
+
+  <div class="info">
+    <div>Raw: <span id="raw">—</span></div>
+    <div>Filtered: <span id="filtered">—</span></div>
+    <div>Speed guard drops: <span id="drops">0</span></div>
+  </div>
+
+  <canvas id="plot" width="800" height="200"></canvas>
+
+  <pre id="log" class="log"></pre>
+
+  <script src="script.js"></script>
+</body>
+</html>

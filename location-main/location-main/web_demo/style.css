@@ -1,0 +1,12 @@
+body { font-family: Arial, sans-serif; padding: 16px; }
+h1 { margin-top: 0; }
+.controls { display:flex; gap:12px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+.controls label { display:flex; gap:6px; align-items:center; }
+.controls input[type="range"] { width:140px; }
+.controls input[type="number"] { width:80px; }
+.controls button { padding:6px 10px; }
+.status-inside { color: green; font-weight:600; }
+.status-outside { color: red; font-weight:600; }
+.info { margin-bottom:12px; }
+.log { background:#111; color:#0f0; padding:8px; height:160px; overflow:auto; }
+canvas { border:1px solid #ccc; display:block; margin-bottom:12px; }
