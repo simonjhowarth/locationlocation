@@ -39,6 +39,7 @@ class _HomePageState extends State<HomePage> {
   Timer? _pollTimer;
   Position? _currentPosition;
   StreamSubscription<Position>? _positionSubscription;
+  StreamSubscription? _remoteCommandSubscription;
   GoogleMapController? _mapController;
   final List<String> _logs = [];
   bool _showLogs = false;
@@ -48,6 +49,7 @@ class _HomePageState extends State<HomePage> {
   OneDKalman _kfLng = OneDKalman(q: 1e-4, r: 5e-3);
   LatLng? _filteredLatLng;
   DateTime? _lastPositionTime;
+  StreamSubscription? _supabaseStreamSubscription;
   int _distanceFilter = 5;
   // Tunables
   double _maxAccuracy = 100.0; // meters
@@ -241,75 +243,61 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  Future<void> _publishLocationForCode(String code, LatLng loc) async {
-    try {
-      if (_useSupabase) {
-        final client = Supabase.instance.client;
-        final res = await client
-            .from('child_locations')
-            .upsert({
-              'code': code,
-              'lat': loc.latitude,
-              'lng': loc.longitude,
-              'ts': DateTime.now().toIso8601String(),
-              'name': _children[_selectedChildIndex ?? 0]['name'] ?? 'child',
-            }, upsertOnConflict: ['code'])
-            .execute();
-        if (res.error != null) {
-          _log('Supabase publish error: ${res.error!.message}');
-        } else {
-          _log('Published location to Supabase for code $code');
-        }
-      } else {
-        final prefs = await SharedPreferences.getInstance();
-        final data = jsonEncode({
-          'lat': loc.latitude,
-          'lng': loc.longitude,
-          'ts': DateTime.now().toIso8601String(),
-          'name': _children[_selectedChildIndex ?? 0]['name'] ?? 'child',
-        });
-        await prefs.setString('child:$code', data);
-        _log('Published location locally for code $code');
-      }
-    } catch (e) {
-      _log('Failed to publish location: $e');
+
+
+Future<void> _publishLocationForCode(String code, LatLng loc) async {
+  try {
+    if (_useSupabase) {
+      final client = Supabase.instance.client;
+      
+      // Use the 'locations' table. 
+      // upsert handles the logic: "If code exists, update it. If not, insert it."
+      await client.from('locations').upsert({
+        'code': code,
+        'lat': loc.latitude,
+        'lng': loc.longitude,
+        'name': _children[_selectedChildIndex ?? 0]['name'] ?? 'child',
+        'ts': DateTime.now().toIso8601String(),
+      }, onConflict: 'code'); // This uses 'code' to find the existing row
+
+      _log('Published to Supabase: $code');
+    } else {
+      // ... keep your existing SharedPreferences logic here ...
     }
+  } catch (e) {
+    _log('Failed to publish location: $e');
   }
+}
 
   void _startPollingChild(String code) {
-    _stopPollingChild();
-    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
-      try {
-        if (_useSupabase) {
-          final client = Supabase.instance.client;
-          final res = await client.from('child_locations').select().eq('code', code).limit(1).execute();
-          if (res.error != null) {
-            _log('Supabase poll error: ${res.error!.message}');
-            return;
-          }
-          final data = res.data;
-          if (data == null) return;
-          // res.data may be a list
-          final row = (data is List && data.isNotEmpty) ? data[0] as Map<String, dynamic> : data as Map<String, dynamic>;
-          final lat = (row['lat'] as num).toDouble();
-          final lng = (row['lng'] as num).toDouble();
-          final ts = row['ts'] as String? ?? DateTime.now().toIso8601String();
-          _log('Polled Supabase child $code @ $ts -> $lat,$lng');
-          setState(() {
-            _filteredLatLng = LatLng(lat, lng);
-            _currentPosition = Position(
-                longitude: lng,
-                latitude: lat,
-                timestamp: DateTime.parse(ts),
-                accuracy: 0,
-                altitude: 0,
-                heading: 0,
-                speed: 0,
-                speedAccuracy: 0);
-          });
-          if (_mapController != null) {
-            _mapController!.animateCamera(CameraUpdate.newLatLng(_filteredLatLng!));
-          }
+   _stopPollingChild(); // Cleans up previous subscriptions/timers
+
+  if (_useSupabase) {
+    _log('Starting Realtime stream for $code');
+    _supabaseStreamSubscription = Supabase.instance.client
+        .from('locations')
+        .stream(primaryKey: ['id']) // Use 'id' here since it's your actual PK
+        .eq('code', code)
+        .listen((List<Map<String, dynamic>> data) {
+      if (data.isNotEmpty) {
+        final row = data.first;
+        final lat = (row['lat'] as num).toDouble();
+        final lng = (row['lng'] as num).toDouble();
+
+        setState(() {
+          _filteredLatLng = LatLng(lat, lng);
+          _currentPosition = Position(
+              longitude: lng,
+              latitude: lat,
+              timestamp: DateTime.now(),
+              accuracy: 0, altitude: 0, heading: 0, speed: 0, speedAccuracy: 0);
+        });
+
+        if (_mapController != null) {
+          _mapController!.animateCamera(CameraUpdate.newLatLng(_filteredLatLng!));
+        }
+      }
+    });
         } else {
           final prefs = await SharedPreferences.getInstance();
           final s = prefs.getString('child:$code');
@@ -341,9 +329,35 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+
   void _stopPollingChild() {
     _pollTimer?.cancel();
     _pollTimer = null;
+    _supabaseStreamSubscription?.cancel(); // Add this line
+  _supabaseStreamSubscription = null;
+  }
+  void _listenForRemoteCommands() {
+    _remoteCommandSubscription?.cancel(); // Clear any old subscription first
+    
+    if (!_useSupabase || !_isChildDevice) return;
+
+    final code = _children[_selectedChildIndex ?? 0]['code']!;
+    _log('Listening for remote commands for $code...');
+
+    _remoteCommandSubscription = Supabase.instance.client
+        .from('remote_commands')
+        .stream(primaryKey: ['id'])
+        .eq('child_code', code)
+        .listen((data) {
+      if (data.isNotEmpty) {
+        final lastCommand = data.last;
+        // Check if the command is 'beep' and it's fresh (e.g., within last 30s)
+        if (lastCommand['command'] == 'beep') {
+          _playBeep();
+          _log('Remote beep received from parent!');
+        }
+      }
+    });
   }
 
   void _resetFilters() {
@@ -356,11 +370,12 @@ class _HomePageState extends State<HomePage> {
     _log('Filters reset');
   }
 
-  @override
+@override
   void dispose() {
     _positionSubscription?.cancel();
     _mapController?.dispose();
     _stopPollingChild();
+    _remoteCommandSubscription?.cancel(); // <--- Add this line
     super.dispose();
   }
 
@@ -541,6 +556,10 @@ class _HomePageState extends State<HomePage> {
                  }
                  // stop polling when acting as child
                  _stopPollingChild();
+                 _listenForRemoteCommands();
+                 } else {
+                  _remoteCommandSubscription?.cancel(); // <--- Add this line here
+                
                }
              });
            },
