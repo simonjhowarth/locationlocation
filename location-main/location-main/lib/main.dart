@@ -244,31 +244,32 @@ class _HomePageState extends State<HomePage> {
   }
 
 
-
 Future<void> _publishLocationForCode(String code, LatLng loc) async {
-  try {
-    if (_useSupabase) {
-      final client = Supabase.instance.client;
-      
-      // Use the 'locations' table. 
-      // upsert handles the logic: "If code exists, update it. If not, insert it."
-      await client.from('locations').upsert({
-        'code': code,
-        'lat': loc.latitude,
-        'lng': loc.longitude,
-        'name': _children[_selectedChildIndex ?? 0]['name'] ?? 'child',
-        'ts': DateTime.now().toIso8601String(),
-      }, onConflict: 'code'); // This uses 'code' to find the existing row
-
-      _log('Published to Supabase: $code');
-    } else {
-      // ... keep your existing SharedPreferences logic here ...
-    }
-  } catch (e) {
-    _log('Failed to publish location: $e');
-  }
-}
-
+    try {
+      if (_useSupabase) {
+        await Supabase.instance.client.from('locations').upsert({
+          'code': code,
+          'lat': loc.latitude,
+          'lng': loc.longitude,
+          'name': _children[_selectedChildIndex ?? 0]['name'] ?? 'child',
+          'ts': DateTime.now().toIso8601String(),
+        }, onConflict: 'code');
+        _log('Published to Supabase for code $code');
+      } else {
+        final prefs = await SharedPreferences.getInstance();
+        final data = jsonEncode({
+          'lat': loc.latitude,
+          'lng': loc.longitude,
+          'ts': DateTime.now().toIso8601String(),
+          'name': _children[_selectedChildIndex ?? 0]['name'] ?? 'child',
+        });
+        await prefs.setString('child:$code', data);
+        _log('Published location locally for code $code');
+      }
+    } catch (e) {
+      _log('Failed to publish location: $e');
+    } // This closes the catch
+  } // This closes the method
   void _startPollingChild(String code) {
    _stopPollingChild(); // Cleans up previous subscriptions/timers
 
@@ -317,7 +318,10 @@ Future<void> _publishLocationForCode(String code, LatLng loc) async {
                 altitude: 0,
                 heading: 0,
                 speed: 0,
-                speedAccuracy: 0);
+                speedAccuracy: 0
+                altitudeAccuracy: 0, // <--- Add this
+  headingAccuracy: 0,
+                );
           });
           if (_mapController != null) {
             _mapController!.animateCamera(CameraUpdate.newLatLng(_filteredLatLng!));
